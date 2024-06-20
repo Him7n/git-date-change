@@ -5,6 +5,9 @@ import Table from "cli-table";
 import { getCommits, changeDate } from "./git.js";
 import chalkAnimation from "chalk-animation";
 import inquirer from "inquirer";
+import chalk from "chalk";
+import DatePrompt from "inquirer-date-prompt";
+import moment from "moment";
 const argv = minimist(process.argv.slice(2));
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -59,12 +62,13 @@ If you don't see formatted output, try to increase width of the terminal to have
   ];
   inquirer.prompt(question).then((answers) => {
     if (!answers.Method) {
-      const ani = chalkAnimation.radar(
-        "the entire logic come here soon ................"
-      );
+      // chalk.BackgroundColor("Here we go");
+      const auto = chalkAnimation.rainbow("Here we go Ill remove this line");
       setTimeout(() => {
-        ani.stop();
-      }, 2000);
+        auto.stop();
+      }, 1000);
+
+      TimeRange();
     } else {
       try {
         start({
@@ -83,7 +87,22 @@ If you don't see formatted output, try to increase width of the terminal to have
     }
   });
 };
+async function getTimestamp() {
+  const { timestamp } = await inquirer.prompt({
+    type: "date",
+    name: "timestamp",
+    message: "When will the world end?",
+    prefix: " 🌎 ",
 
+    filter: (d) => Math.floor(d.getTime() / 1000),
+    validate: (t) => t * 1000 > Date.now() + 86400000 || "God I hope not!",
+    transformer: (s) => chalk.bold.red(s),
+    locale: "en-US",
+    format: { month: "short", hour: undefined, minute: undefined },
+    clearable: true,
+  });
+  return timestamp;
+}
 const ask = (question) =>
   new Promise((resolve, reject) => {
     console.log("");
@@ -198,3 +217,41 @@ const start = async (filter) => {
 };
 
 welcome();
+
+async function TimeRange() {
+  inquirer
+    .prompt({
+      type: "input",
+      name: "Date",
+      message: "Enter a date [ex. Thu Jun 20 17:45:44 2024 +0530]",
+      prefix: " 🌎 ",
+      transformer: (s) => chalk.bold.greenBright(s),
+      validate: (input) => {
+        const format = "ddd MMM DD HH:mm:ss YYYY ZZ"; // Define the expected format
+        if (moment(input, format, true).isValid()) {
+          return true;
+        } else {
+          return `Please enter the date in the correct format: ${format}`;
+        }
+      },
+    })
+    .then((ans) => {
+      console.log(ans);
+    });
+
+  let commits;
+  let commit;
+
+  const dirPath = argv.path || process.cwd();
+
+  getCommits(dirPath, {
+    count: argv.count || 5,
+    hash: argv.hash,
+  }).then((_commits) => {
+    commits = _commits;
+
+    console.log(commits);
+    return logCommits(commits);
+  });
+  // here calculate the line addded count of the each commit and console log it
+}
