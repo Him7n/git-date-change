@@ -67,6 +67,7 @@ export const CommitLOCcount = async (path) => {
     // Loop through the lines and assume that every even index line (0, 2, 4, ...) is a commit hash
     for (let i = 0; i < lines.length; i += 2) {
       const commitHash = lines[i].trim();
+      // insertion lines are the odd ones
       if (commitHash.length === 40 && i + 1 < lines.length) {
         // Check if next line exists
         const statsLine = lines[i + 1].trim();

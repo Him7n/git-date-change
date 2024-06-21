@@ -220,11 +220,12 @@ welcome();
 
 async function TimeRange() {
   let startDate;
-  let EndDate;
+  let endDate;
+
   inquirer
     .prompt({
       type: "input",
-      name: "Date",
+      name: "startDate",
       message: "Enter StartDate [ex. Thu Jun 20 17:45:44 2024 +0530]",
       prefix: " 🌎 ",
       transformer: (s) => chalk.bold.greenBright(s),
@@ -238,16 +239,12 @@ async function TimeRange() {
       },
     })
     .then((ans) => {
-      startDate = moment(ans.Date, "ddd MMM DD HH:mm:ss YYYY ZZ");
-      // startDate = ans;
-      console.log(startDate);
-      console.log(typeof startDate);
-      console.log(ans);
+      startDate = moment(ans.startDate, "ddd MMM DD HH:mm:ss YYYY ZZ");
 
       inquirer
         .prompt({
           type: "input",
-          name: "Date",
+          name: "endDate",
           message: "Enter EndDate [ex. Thu Jun 20 17:45:44 2024 +0530]",
           prefix: " 🌎 ",
           transformer: (s) => chalk.bold.greenBright(s),
@@ -261,30 +258,17 @@ async function TimeRange() {
           },
         })
         .then((ans) => {
-          EndDate = moment(ans.Date, "ddd MMM DD HH:mm:ss YYYY ZZ");
-          // startDate = ans;
-          console.log(EndDate);
-          console.log(typeof EndDate);
-          console.log(ans);
+          endDate = moment(ans.endDate, "ddd MMM DD HH:mm:ss YYYY ZZ");
+          const duration = endDate.diff(startDate, "minutes");
+          console.log(endDate.add(duration, "minutes"));
+          console.log(
+            `Added the duration in the EndDate and Displayed it in Date Format ${endDate}`
+          );
+          chalkAnimation.neon(endDate.toString()).start();
+
+          console.log(
+            `The difference between the two dates is ${duration} minutes.`
+          );
         });
     });
-
-  // ive got the Start Date and the EndDate
-  let commits;
-  let commit;
-
-  const dirPath = argv.path || process.cwd();
-  CommitLOCcount(dirPath).then((result) => {
-    console.log(result);
-  });
-  // getCommits(dirPath, {
-  //   count: argv.count || 5,
-  //   hash: argv.hash,
-  // }).then((_commits) => {
-  //   commits = _commits;
-
-  //   console.log(commits);
-  //   return logCommits(commits);
-  // });
-  // here calculate the line addded count of the each commit and console log it
 }
