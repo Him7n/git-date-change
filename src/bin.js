@@ -2,7 +2,7 @@ import minimist from "minimist";
 import colors from "colors";
 import prompt from "prompt";
 import Table from "cli-table";
-import { getCommits, changeDate } from "./git.js";
+import { getCommits, changeDate, CommitLOCcount } from "./git.js";
 import chalkAnimation from "chalk-animation";
 import inquirer from "inquirer";
 import chalk from "chalk";
@@ -274,15 +274,17 @@ async function TimeRange() {
   let commit;
 
   const dirPath = argv.path || process.cwd();
-
-  getCommits(dirPath, {
-    count: argv.count || 5,
-    hash: argv.hash,
-  }).then((_commits) => {
-    commits = _commits;
-
-    console.log(commits);
-    return logCommits(commits);
+  CommitLOCcount(dirPath).then((result) => {
+    console.log(result);
   });
+  // getCommits(dirPath, {
+  //   count: argv.count || 5,
+  //   hash: argv.hash,
+  // }).then((_commits) => {
+  //   commits = _commits;
+
+  //   console.log(commits);
+  //   return logCommits(commits);
+  // });
   // here calculate the line addded count of the each commit and console log it
 }
