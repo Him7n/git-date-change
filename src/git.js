@@ -48,3 +48,5 @@ export const changeDate = async (path, hash, authorDate, committerDate) => {
     return throwError(err);
   }
 };
+
+export const CommitLOCcount = () => {};

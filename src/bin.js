@@ -219,11 +219,13 @@ const start = async (filter) => {
 welcome();
 
 async function TimeRange() {
+  let startDate;
+  let EndDate;
   inquirer
     .prompt({
       type: "input",
       name: "Date",
-      message: "Enter a date [ex. Thu Jun 20 17:45:44 2024 +0530]",
+      message: "Enter StartDate [ex. Thu Jun 20 17:45:44 2024 +0530]",
       prefix: " 🌎 ",
       transformer: (s) => chalk.bold.greenBright(s),
       validate: (input) => {
@@ -236,9 +238,38 @@ async function TimeRange() {
       },
     })
     .then((ans) => {
+      startDate = moment(ans.Date, "ddd MMM DD HH:mm:ss YYYY ZZ");
+      // startDate = ans;
+      console.log(startDate);
+      console.log(typeof startDate);
       console.log(ans);
+
+      inquirer
+        .prompt({
+          type: "input",
+          name: "Date",
+          message: "Enter EndDate [ex. Thu Jun 20 17:45:44 2024 +0530]",
+          prefix: " 🌎 ",
+          transformer: (s) => chalk.bold.greenBright(s),
+          validate: (input) => {
+            const format = "ddd MMM DD HH:mm:ss YYYY ZZ"; // Define the expected format
+            if (moment(input, format, true).isValid()) {
+              return true;
+            } else {
+              return `Please enter the date in the correct format: ${format}`;
+            }
+          },
+        })
+        .then((ans) => {
+          EndDate = moment(ans.Date, "ddd MMM DD HH:mm:ss YYYY ZZ");
+          // startDate = ans;
+          console.log(EndDate);
+          console.log(typeof EndDate);
+          console.log(ans);
+        });
     });
 
+  // ive got the Start Date and the EndDate
   let commits;
   let commit;
 
