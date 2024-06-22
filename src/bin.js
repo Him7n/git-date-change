@@ -2,14 +2,24 @@ import minimist from "minimist";
 import colors from "colors";
 import prompt from "prompt";
 import Table from "cli-table";
-import { getCommits, changeDate, CommitLOCcount } from "./git.js";
+import {
+  getCommits,
+  changeDate,
+  CommitLOCcount,
+  gitIgnorFiles,
+  gitIgnoreFiles,
+} from "./git.js";
 import chalkAnimation from "chalk-animation";
 import inquirer from "inquirer";
 import chalk from "chalk";
 import DatePrompt from "inquirer-date-prompt";
 import moment from "moment";
+import inquirerFileTreeSelection from "inquirer-file-tree-selection-prompt";
 const argv = minimist(process.argv.slice(2));
-
+import path from "path";
+import * as url from "node:url";
+const __filename = url.fileURLToPath(import.meta.url);
+const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const welcome = async () => {
@@ -257,7 +267,7 @@ async function TimeRange() {
             }
           },
         })
-        .then((ans) => {
+        .then(async (ans) => {
           endDate = moment(ans.endDate, "ddd MMM DD HH:mm:ss YYYY ZZ");
           const duration = endDate.diff(startDate, "minutes");
           console.log(endDate.add(duration, "minutes"));
@@ -269,6 +279,92 @@ async function TimeRange() {
           console.log(
             `The difference between the two dates is ${duration} minutes.`
           );
+          console.log("Which files/folders commits should be excuded ?");
+          const Files = [];
+          await AskIgnore(Files);
+
+          // there is  a problem with the closure /async so Ill continue at the calling funcitnon
         });
+    });
+}
+const AskIgnore = async (Files) => {
+  const path2 = argv.path || process.cwd();
+
+  inquirer.registerPrompt("file-tree-selection", inquirerFileTreeSelection);
+  inquirer
+    .prompt([
+      {
+        root: path2,
+        type: "file-tree-selection",
+        name: "file",
+
+        // multiple: true,
+      },
+    ])
+    .then((answers) => {
+      console.log(JSON.stringify(answers));
+      console.log(answers);
+      // here remove the path from the answers.Files path
+      // console.log(JSON.stringify(answers.files));
+      const relativeFilePath = path.relative(path2, answers.file);
+      console.log(relativeFilePath);
+      // path is a the path fo the repository and the answers.file is the absolute path
+      Files.push(relativeFilePath);
+      console.log(Files);
+      inquirer
+        .prompt({
+          type: "confirm",
+          name: "another",
+          message: "Do you want to add another file/folder to be ignored?",
+          default: false,
+          prefix: " 🌎 ",
+          // transformer: (s) => chalk.bold.bgRedBright(s),
+        })
+        .then((ans) => {
+          console.log(ans.another);
+
+          // Check the user's response and react accordingly
+          if (ans.another) {
+            console.log("Adding another file...");
+            AskIgnore(Files); // Call the function again to add more files
+          } else {
+            console.log("No more files to add.");
+            console.log("Final list of files/folders to be ignored:", Files);
+            // console.log(__dirname);
+            gitIgnoreFiles(path2, Files)
+              .then((results) => {
+                console.log("Filtered Commit Insertions:", results);
+              })
+              .catch((err) => {
+                console.error("Error processing commits:", err);
+              });
+          }
+        });
+    });
+};
+
+function askToAddAnother(Files) {
+  // Make sure to pass Files here
+  inquirer
+    .prompt({
+      type: "confirm",
+      name: "another",
+      message: "Do you want to add another file/folder to be ignored?",
+      default: false,
+      prefix: " 🌎 ",
+      transformer: (s) => chalk.bold.greenBright(s),
+    })
+    .then((ans) => {
+      console.log(ans);
+
+      // Check the user's response and react accordingly
+      if (ans.another) {
+        console.log("Adding another file...");
+        AskIgnore(Files); // Call the function again to add more files, passing the Files array
+      } else {
+        console.log("No more files to add.");
+        console.log("Final list of files/folders to be ignored:", Files);
+        // Continue with the rest of your program
+      }
     });
 }

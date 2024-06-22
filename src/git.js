@@ -2,10 +2,29 @@ import moment from "moment";
 import throwError from "./errors/throwError.js";
 import gitLogConverter from "./gitLogConverter.js";
 import execute from "./execute.js";
+import path from "path";
 // import UnstagedChangesError from "./errors/UnstagedChangesError.js";
 
 moment.suppressDeprecationWarnings = true;
+const getRepoRoot = async (repoPath) => {
+  try {
+    const { stdout } = await execute("git rev-parse --show-toplevel", {
+      cwd: repoPath,
+    });
+    return stdout.trim();
+  } catch (error) {
+    throw new Error("Failed to find Git repository root: " + error.message);
+  }
+};
 
+// Function to normalize file paths to be relative to the repository root
+const normalizePaths = (repoRoot, filePaths) => {
+  return filePaths.map((filePath) => {
+    // Make the path relative to the repository root
+    const relativePath = path.relative(repoRoot, filePath);
+    return relativePath.replace(/\\/g, "/"); // Convert backslashes to forward slashes for Unix compatibility
+  });
+};
 export const getCommits = async (path, { count, hash }) => {
   let commitLog;
 
@@ -93,5 +112,64 @@ export const CommitLOCcount = async (path) => {
     return results;
   } catch (err) {
     throwError(err); // Proper error handling
+  }
+};
+// Files aray contains the path of the files and Folders to be ignored
+// const gitIgnoreFiles = (Files) => {};
+export const gitIgnorFiles = async (repoPath, ignoreFiles) => {
+  try {
+    const logOutput = await execute(
+      `cd ${repoPath} && git log --pretty=format:'%H' --numstat`
+    );
+    if (!logOutput) {
+      throw new Error("No output from git command");
+    }
+
+    const lines = logOutput.split("\n").filter((line) => line.trim() !== "");
+    let totalInsertions = 0;
+    const commitData = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const lineParts = lines[i].split("\t");
+      if (lineParts.length === 3) {
+        const [insertions, , filePath] = lineParts;
+        if (!isIgnored(filePath, ignoreFiles)) {
+          const insertionsCount = parseInt(insertions, 10);
+          if (!isNaN(insertionsCount)) {
+            totalInsertions += insertionsCount;
+            commitData.push({
+              filePath,
+              insertions: insertionsCount,
+            });
+          }
+        }
+      }
+    }
+
+    const results = commitData.map((data) => ({
+      ...data,
+      effortPercentage: (data.insertions / totalInsertions) * 100,
+    }));
+
+    return results;
+  } catch (err) {
+    throw err;
+  }
+};
+
+function isIgnored(filePath, ignoreFiles) {
+  return ignoreFiles.some((ignoreFile) => filePath.includes(ignoreFile));
+}
+
+export const gitIgnoreFiles = async (repoPath, Files) => {
+  try {
+    // Get the repository root path to ensure paths are relative to it
+    // const repoRoot = await getRepoRoot(repoPath);
+    console.log("Repo path which  was passed", repoPath);
+    // const normalizedIgnoreFiles = normalizePaths(repoPath, Files);
+    const results = await gitIgnorFiles(repoPath, Files);
+    return results;
+  } catch (err) {
+    throwError(err);
   }
 };

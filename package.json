@@ -13,10 +13,13 @@
     "chalk-animation": "^2.0.3",
     "cli-table": "^0.3.11",
     "colors": "^1.4.0",
+    "fzf": "^0.5.2",
     "inquirer": "^9.2.23",
     "inquirer-date-prompt": "^3.0.0",
+    "inquirer-file-tree-selection-prompt": "^2.0.5",
     "minimist": "^1.2.8",
     "moment": "^2.30.1",
+    "path": "^0.12.7",
     "prompt": "^1.3.0"
   }
 }
