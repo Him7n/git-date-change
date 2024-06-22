@@ -125,30 +125,43 @@ export const gitIgnorFiles = async (repoPath, ignoreFiles) => {
       throw new Error("No output from git command");
     }
 
-    const lines = logOutput.split("\n").filter((line) => line.trim() !== "");
-    let totalInsertions = 0;
-    const commitData = [];
+    const lines = logOutput.split("\n");
+    let commitData = {};
+    let currentHash = null;
 
-    for (let i = 0; i < lines.length; i++) {
-      const lineParts = lines[i].split("\t");
-      if (lineParts.length === 3) {
-        const [insertions, , filePath] = lineParts;
-        if (!isIgnored(filePath, ignoreFiles)) {
-          const insertionsCount = parseInt(insertions, 10);
-          if (!isNaN(insertionsCount)) {
-            totalInsertions += insertionsCount;
-            commitData.push({
-              filePath,
-              insertions: insertionsCount,
-            });
+    lines.forEach((line) => {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) return; // Skip empty lines
+
+      // Check if the line is a commit hash
+      if (trimmedLine.length === 40 && !/\t/.test(trimmedLine)) {
+        currentHash = trimmedLine;
+        if (!commitData[currentHash]) {
+          commitData[currentHash] = {
+            hash: currentHash,
+            filePaths: [],
+            totalInsertions: 0,
+          };
+        }
+      } else {
+        const lineParts = trimmedLine.split("\t");
+        if (lineParts.length === 3) {
+          const [insertions, , filePath] = lineParts;
+          if (!isIgnored(filePath, ignoreFiles)) {
+            const insertionsCount = parseInt(insertions, 10);
+            if (!isNaN(insertionsCount)) {
+              commitData[currentHash].filePaths.push(filePath);
+              commitData[currentHash].totalInsertions += insertionsCount;
+            }
           }
         }
       }
-    }
+    });
 
-    const results = commitData.map((data) => ({
-      ...data,
-      effortPercentage: (data.insertions / totalInsertions) * 100,
+    const results = Object.values(commitData).map((commit) => ({
+      ...commit,
+      effortPercentage:
+        (commit.totalInsertions / totalInsertions(commitData)) * 100,
     }));
 
     return results;
@@ -159,6 +172,13 @@ export const gitIgnorFiles = async (repoPath, ignoreFiles) => {
 
 function isIgnored(filePath, ignoreFiles) {
   return ignoreFiles.some((ignoreFile) => filePath.includes(ignoreFile));
+}
+
+function totalInsertions(data) {
+  return Object.values(data).reduce(
+    (acc, commit) => acc + commit.totalInsertions,
+    0
+  );
 }
 
 export const gitIgnoreFiles = async (repoPath, Files) => {
