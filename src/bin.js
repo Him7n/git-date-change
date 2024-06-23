@@ -303,7 +303,7 @@ function calculateNewCommitDates(results, startDate) {
     const timePeriodMinutes = parseInt(commit.timePeriodAssigned, 10);
 
     // Check for NaN and set to 0 if parsed value is not a number
-    if (isNaN(timePeriodMinutesassignTime)) {
+    if (isNaN(timePeriodMinutes)) {
       console.error(
         `Invalid time period for commit ${commit.hash}, setting to 0.`
       );
@@ -312,7 +312,7 @@ function calculateNewCommitDates(results, startDate) {
     }
 
     // Add the time period to the current date
-    currentDate.add(timePeriodMinutes, "minutes");
+    currentDate.add(timePeriodMinutes, "seconds");
 
     // Store the new date in the commit object
     commit.actualTime = currentDate.format("ddd MMM DD HH:mm:ss YYYY ZZ");
@@ -368,8 +368,8 @@ async function TimeRange() {
         })
         .then(async (ans) => {
           endDate = moment(ans.endDate, "ddd MMM DD HH:mm:ss YYYY ZZ");
-          const duration = endDate.diff(startDate, "minutes");
-          console.log(endDate.add(duration, "minutes"));
+          const duration = endDate.diff(startDate, "seconds");
+          console.log(endDate.add(duration, "seconds"));
           console.log(
             `Added the duration in the EndDate and Displayed it in Date Format ${endDate}`
           );
@@ -392,6 +392,33 @@ async function TimeRange() {
         });
     });
 }
+function checkIfTimeEnough(inputTime, results, durationinInt) {
+  // Convert inputTime from "HH:mm:ss" to total seconds
+  const parts = inputTime.split(":");
+  const hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1], 10);
+  const seconds = parseInt(parts[2], 10);
+  console.log(results);
+  const minsecs = hours * 3600 + minutes * 60 + seconds;
+  const noofCommits = results.length;
+  const totalInputSeconds = noofCommits * minsecs;
+  // Define the minimum required seconds, e.g., 30 minutes
+  const minimumRequiredSeconds = durationinInt; // 30 minutes in seconds
+
+  // Check if the entered time is enough
+  if (totalInputSeconds >= minimumRequiredSeconds) {
+    console.error(
+      "The minimum time required should be less than",
+      Math.floor(durationinInt / noofCommits)
+    );
+    return false;
+  } else {
+    // console.log("min time chalega!");
+    return true;
+  }
+  k;
+}
+
 const AskIgnore = async (Files, durationinInt, startDate) => {
   // console.log("duration in int");
   // console.log(durationinInt);
@@ -454,7 +481,16 @@ const AskIgnore = async (Files, durationinInt, startDate) => {
                     validate: (input) => {
                       const format = "HH:mm:ss"; // Define the expected format
                       if (moment(input, format, true).isValid()) {
-                        return true;
+                        if (!checkIfTimeEnough(input, results, durationinInt)) {
+                          let noofCommits = results.length;
+                          return `The minimum time required should be less than ${Math.floor(
+                            durationinInt / noofCommits
+                          )} seconds.`;
+
+                          // return false;
+                        } else {
+                          return true;
+                        }
                       } else {
                         return `Please enter the time in the correct format: ${format}`;
                       }
@@ -463,6 +499,11 @@ const AskIgnore = async (Files, durationinInt, startDate) => {
                   .then((result) => {
                     const mintime = moment(result.duration, "HH:mm:ss");
                     console.log(mintime);
+                    const Mintiemsec = mintime.format("second");
+                    console.log(
+                      "Min time isn secodns thru the format --------",
+                      Mintiemsec
+                    );
                     // console.log(results.length);
                     const timeString = result.duration; // "HH:mm:ss"
                     const parts = timeString.split(":");
@@ -470,20 +511,24 @@ const AskIgnore = async (Files, durationinInt, startDate) => {
                     const minutes = parseInt(parts[1], 10);
                     const seconds = parseInt(parts[2], 10);
 
-                    const totalMinutes = Math.floor(
-                      hours * 60 + minutes + seconds / 60
+                    const minSec = Math.floor(
+                      hours * 60 * 60 + minutes * 60 + seconds
                     );
 
-                    console.log("Total Minutes:", Math.floor(totalMinutes));
+                    // console.log("Total Minutes:", Math.floor(totalMinutes));
                     const minTimeMinutes = mintime.format("seconds");
                     console.log(minTimeMinutes);
+
                     // const totalMinutes = console.log(totalMinutes);
                     console.log(
                       durationinInt,
                       "this should be in minutes why undefined"
                     );
-
-                    assignTimePeriods(results, durationinInt, totalMinutes);
+                    console.log(
+                      "min seconds for each commmit thu the calculation ",
+                      minSec
+                    );
+                    assignTimePeriods(results, durationinInt, minSec);
                     //returnign the results ;
                     // return results;
 
@@ -563,8 +608,11 @@ function calculateRemainingTime(
 // }
 
 function assignTimePeriods(results, totalTimeMinutes, minimumTimeMinutes) {
-  const totalMinimumTime = results.length * minimumTimeMinutes;
-  let remainingTime = totalTimeMinutes - totalMinimumTime;
+  let remainingTime = totalTimeMinutes - results.length * minimumTimeMinutes;
+  const totalEffortPoints = results.reduce(
+    (sum, commit) => sum + commit.effortPercentage,
+    0
+  );
 
   if (remainingTime < 0) {
     console.error(
@@ -573,27 +621,68 @@ function assignTimePeriods(results, totalTimeMinutes, minimumTimeMinutes) {
     remainingTime = 0;
   }
 
-  const totalEffortPoints = results.reduce(
-    (sum, commit) => sum + commit.effortPercentage,
-    0
-  );
   results.forEach((commit, index) => {
-    let effortTime =
-      totalEffortPoints > 0
-        ? (commit.effortPercentage / totalEffortPoints) * remainingTime
-        : 0;
-    const offset = (results.length - index) * 0.1; // Increasing offset based on the index position
-    commit.timePeriodAssigned = Math.round(
-      minimumTimeMinutes + effortTime + offset
-    );
+    if (commit.effortPercentage > 0) {
+      let effortTime =
+        (commit.effortPercentage / totalEffortPoints) * remainingTime;
+      commit.timePeriodAssigned = Math.round(minimumTimeMinutes + effortTime);
+    } else {
+      // For 0% effort, assign a random additional time between 0 and a defined offset
+      const offset = 0.2 * minimumTimeMinutes; // Random offset up to 20% of minimumTimeMinutes
+      commit.timePeriodAssigned =
+        minimumTimeMinutes + Math.floor(Math.random() * offset);
+    }
     commit.timePeriodAssigned = Math.max(
       commit.timePeriodAssigned,
       minimumTimeMinutes
     ); // Ensure not below minimum
   });
+  console.log("Before Normalisation");
+  console.log(results);
+  // logCommitDetailsTable(results)
 
-  normalizeTimeAssignments(results, totalTimeMinutes);
+  normalizeTimeAssignments(results, totalTimeMinutes, minimumTimeMinutes);
   return results;
+}
+
+function normalizeTimeAssignments(
+  results,
+  totalTimeMinutes,
+  minimumTimeMinutes
+) {
+  let assignedTotal = results.reduce(
+    (acc, commit) => acc + commit.timePeriodAssigned,
+    0
+  );
+  let excessTime = assignedTotal - totalTimeMinutes;
+  console.log(excessTime);
+  if (excessTime > 0) {
+    // We need to reduce the total assigned time
+    // Sort results in descending order based on time assigned
+    results.sort((a, b) => b.timePeriodAssigned - a.timePeriodAssigned);
+
+    for (let commit of results) {
+      if (excessTime <= 0) break; // Stop if no excess time remains
+
+      // Calculate possible reduction keeping the minimum time in check
+      let possibleReduction = commit.timePeriodAssigned - minimumTimeMinutes;
+      if (possibleReduction > 0) {
+        let reductionAmount = Math.min(excessTime, possibleReduction);
+        commit.timePeriodAssigned -= reductionAmount;
+        excessTime -= reductionAmount; // Reduce the excess time
+      }
+    }
+
+    // If still excess remains after trying to reduce from all, and we're at minimums
+    if (excessTime > 0) {
+      console.warn(
+        "Cannot reduce further without violating minimum time constraints."
+      );
+    }
+  }
+  console.log(
+    "Normalization complete. Total time is now adjusted to fit within the limit."
+  );
 }
 
 function calculateOffset(index, totalCommits) {
@@ -622,19 +711,19 @@ function calculateOffset(index, totalCommits) {
 //   }
 // }
 
-function normalizeTimeAssignments(results, totalTimeMinutes) {
-  const assignedTotal = results.reduce(
-    (acc, commit) => acc + commit.timePeriodAssigned,
-    0
-  );
+// function normalizeTimeAssignments(results, totalTimeMinutes) {
+//   const assignedTotal = results.reduce(
+//     (acc, commit) => acc + commit.timePeriodAssigned,
+//     0
+//   );
 
-  if (assignedTotal > totalTimeMinutes) {
-    const scale = totalTimeMinutes / assignedTotal;
-    results.forEach((commit) => {
-      commit.timePeriodAssigned = Math.round(commit.timePeriodAssigned * scale);
-    });
-  }
-}
+//   if (assignedTotal > totalTimeMinutes) {
+//     const scale = totalTimeMinutes / assignedTotal;
+//     results.forEach((commit) => {
+//       commit.timePeriodAssigned = Math.round(commit.timePeriodAssigned * scale);
+//     });
+//   }
+// }
 
 function processCommits(timerangeTotal, minimumTime, resultsArray) {
   const processedResults = assignTimePeriods(
