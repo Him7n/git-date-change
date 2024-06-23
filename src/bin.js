@@ -22,6 +22,35 @@ const __filename = url.fileURLToPath(import.meta.url);
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const makeTable = () => {
+  var table = new Table({
+    head: ["TH 1 label", "TH 2 label"],
+    // chars: {
+    //   top: "",
+    //   "top-mid": "",
+    //   "top-left": "",
+    //   "top-right": "",
+    //   bottom: "",
+    //   "bottom-mid": "",
+    //   "bottom-left": "",
+    //   "bottom-right": "",
+    //   left: "",
+    //   "left-mid": "",
+    //   mid: "",
+    //   "mid-mid": "",
+    //   right: "",
+    //   "right-mid": "",
+    //   middle: " ",
+    // },
+    // colWidths: [100, 200],
+  });
+
+  // table is an Array, so you can `push`, `unshift`, `splice` and friends
+  table.push(["First value", "Second value"], ["First value", "Second value"]);
+
+  console.log(table.toString());
+};
+
 const welcome = async () => {
   const rainbow =
     chalkAnimation.rainbow(`⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
@@ -54,7 +83,7 @@ const welcome = async () => {
    
 If you don't see formatted output, try to increase width of the terminal to have more space.
 `);
-
+  // makeTable();
   const question = [
     {
       type: "list",
@@ -228,6 +257,76 @@ const start = async (filter) => {
 
 welcome();
 
+const logCommitDetailsTable = (commits) => {
+  const table = new Table({
+    head: ["No.", "Hash", "Insertions", "Effort", "Time Assigned", "Date"],
+    chars: {
+      top: "",
+      "top-mid": "",
+      "top-left": "",
+      "top-right": "",
+      bottom: "",
+      "bottom-mid": "",
+      "bottom-left": "",
+      "bottom-right": "",
+      left: "",
+      "left-mid": "",
+      mid: "",
+      "mid-mid": "",
+      right: "",
+      "right-mid": "",
+      middle: " ",
+    },
+  });
+
+  table.push(
+    ...commits.map((commit, index) => [
+      index + 1,
+      `${commit.hash}`,
+      commit.totalInsertions,
+
+      commit.effortPercentage.toString().slice(0, 4),
+      commit.timePeriodAssigned,
+      commit.actualTime,
+    ])
+  );
+
+  console.log(table.toString());
+};
+
+function calculateNewCommitDates(results, startDate) {
+  // Make sure to clone the start date to avoid mutating the original date
+  let currentDate = startDate.clone();
+
+  results.forEach((commit) => {
+    // Ensure the time period is correctly parsed as an integer
+    const timePeriodMinutes = parseInt(commit.timePeriodAssigned, 10);
+
+    // Check for NaN and set to 0 if parsed value is not a number
+    if (isNaN(timePeriodMinutesassignTime)) {
+      console.error(
+        `Invalid time period for commit ${commit.hash}, setting to 0.`
+      );
+      commit.actualTime = currentDate.format("ddd MMM DD HH:mm:ss YYYY ZZ");
+      return;
+    }
+
+    // Add the time period to the current date
+    currentDate.add(timePeriodMinutes, "minutes");
+
+    // Store the new date in the commit object
+    commit.actualTime = currentDate.format("ddd MMM DD HH:mm:ss YYYY ZZ");
+  });
+
+  console.log(
+    "----------------------------------------------------------------"
+  );
+  logCommitDetailsTable(results);
+  console.log(results);
+
+  return results; // Return the updated results with the actual commit times
+}
+
 async function TimeRange() {
   let startDate;
   let endDate;
@@ -278,6 +377,7 @@ async function TimeRange() {
           // console.log(parseInt(duration));
           const durationinInt = parseInt(duration);
           console.log(typeof durationinInt);
+          console.log(`it is supposed to be undefined ${durationinInt}`);
 
           chalkAnimation.neon(endDate.toString()).start();
 
@@ -286,13 +386,15 @@ async function TimeRange() {
           );
           console.log("Which files/folders commits should be excuded ?");
           const Files = [];
-          await AskIgnore(Files, durationinInt);
-
+          const result = await AskIgnore(Files, durationinInt, startDate);
+          console.log("result is showing undefined");
           // there is  a problem with the closure /async so Ill continue at the calling funcitnon
         });
     });
 }
-const AskIgnore = async (Files, durationinInt) => {
+const AskIgnore = async (Files, durationinInt, startDate) => {
+  // console.log("duration in int");
+  // console.log(durationinInt);
   const path2 = argv.path || process.cwd();
 
   inquirer.registerPrompt("file-tree-selection", inquirerFileTreeSelection);
@@ -331,7 +433,7 @@ const AskIgnore = async (Files, durationinInt) => {
           // Check the user's response and react accordingly
           if (ans.another) {
             console.log("Adding another file...");
-            AskIgnore(Files); // Call the function again to add more files
+            AskIgnore(Files, durationinInt, startDate); // Call the function again to add more files
           } else {
             console.log("No more files to add.");
             console.log("Final list of files/folders to be ignored:", Files);
@@ -376,7 +478,16 @@ const AskIgnore = async (Files, durationinInt) => {
                     const minTimeMinutes = mintime.format("seconds");
                     console.log(minTimeMinutes);
                     // const totalMinutes = console.log(totalMinutes);
+                    console.log(
+                      durationinInt,
+                      "this should be in minutes why undefined"
+                    );
+
                     assignTimePeriods(results, durationinInt, totalMinutes);
+                    //returnign the results ;
+                    // return results;
+
+                    calculateNewCommitDates(results, startDate);
                   });
               })
               .catch((err) => {
@@ -412,57 +523,117 @@ function askToAddAnother(Files) {
       }
     });
 }
+function calculateRemainingTime(
+  totalTimeMinutes,
+  minimumTimeMinutes,
+  numCommits
+) {
+  if (isNaN(totalTimeMinutes) || totalTimeMinutes <= 0) {
+    console.log(totalTimeMinutes);
+    throw new Error(
+      "Invalid or non-positive total time provided.",
+      totalTimeMinutes
+    );
+  }
+  if (isNaN(minimumTimeMinutes) || minimumTimeMinutes < 0) {
+    throw new Error("Invalid or negative minimum time provided.");
+  }
+  if (isNaN(numCommits) || numCommits <= 0) {
+    throw new Error("Invalid or non-positive number of commits provided.");
+  }
+
+  const totalMinimumRequiredTime = minimumTimeMinutes * numCommits;
+  let remainingTime = totalTimeMinutes - totalMinimumRequiredTime;
+
+  if (remainingTime < 0) {
+    console.warn(
+      `Warning: Not enough total time (${totalTimeMinutes} minutes) to allocate minimum time (${minimumTimeMinutes} minutes each) to ${numCommits} commits. Adjusting remaining time to zero.`
+    );
+    remainingTime = 0;
+  }
+
+  return remainingTime;
+}
+// function calculateOffset(index, totalCommits, totalMinutes) {
+//   const baseOffsetPercentage = 0.05; // 5% of the minimum time
+//   const decrementPerCommit = baseOffsetPercentage / totalCommits;
+//   const offsetForThisCommit =
+//     (baseOffsetPercentage - index * decrementPerCommit) * totalMinutes;
+//   return Math.max(0, Math.round(offsetForThisCommit)); // Ensure non-negative offset
+// }
 
 function assignTimePeriods(results, totalTimeMinutes, minimumTimeMinutes) {
-  let remainingTime = totalTimeMinutes - results.length * minimumTimeMinutes;
-  console.log("Remaining Time:", remainingTime);
+  const totalMinimumTime = results.length * minimumTimeMinutes;
+  let remainingTime = totalTimeMinutes - totalMinimumTime;
 
   if (remainingTime < 0) {
     console.error(
       "Error: Not enough total time to allocate minimum time to each commit."
     );
-    remainingTime = 0; // Reset remaining time to avoid negative values
+    remainingTime = 0;
   }
 
-  // Initial assignment
-  results.forEach((commit) => {
-    let effortTime = (commit.effortPercentage / 100) * remainingTime;
+  const totalEffortPoints = results.reduce(
+    (sum, commit) => sum + commit.effortPercentage,
+    0
+  );
+  results.forEach((commit, index) => {
+    let effortTime =
+      totalEffortPoints > 0
+        ? (commit.effortPercentage / totalEffortPoints) * remainingTime
+        : 0;
+    const offset = (results.length - index) * 0.1; // Increasing offset based on the index position
+    commit.timePeriodAssigned = Math.round(
+      minimumTimeMinutes + effortTime + offset
+    );
     commit.timePeriodAssigned = Math.max(
-      minimumTimeMinutes,
-      Math.round(effortTime + minimumTimeMinutes)
-    );
-    console.log(
-      "Initial Time Assigned for commit",
-      commit.hash,
-      ":",
       commit.timePeriodAssigned,
-      "minutes"
-    );
+      minimumTimeMinutes
+    ); // Ensure not below minimum
   });
 
-  // Normalize if total assigned time exceeds the total available time
+  normalizeTimeAssignments(results, totalTimeMinutes);
+  return results;
+}
+
+function calculateOffset(index, totalCommits) {
+  // Offset reduces as the index increases, providing variability
+  const maxOffsetPercentage = 0.01; // 1% of the total time
+  return Math.floor(
+    (totalCommits - index) * maxOffsetPercentage * totalCommits
+  );
+}
+
+// function normalizeTimeAssignments(results, totalTimeMinutes) {
+//   const assignedTotal = results.reduce(
+//     (acc, commit) => acc + commit.timePeriodAssigned,
+//     0
+//   );
+
+//   if (assignedTotal > totalTimeMinutes) {
+//     const scale = totalTimeMinutes / assignedTotal;
+//     results.forEach((commit) => {
+//       commit.timePeriodAssigned = Math.round(commit.timePeriodAssigned * scale);
+//       commit.timePeriodAssigned = Math.max(
+//         commit.timePeriodAssigned,
+//         minimumTimeMinutes
+//       ); // Recheck minimum
+//     });
+//   }
+// }
+
+function normalizeTimeAssignments(results, totalTimeMinutes) {
   const assignedTotal = results.reduce(
     (acc, commit) => acc + commit.timePeriodAssigned,
     0
   );
-  console.log("Assigned Total before normalization:", assignedTotal);
 
   if (assignedTotal > totalTimeMinutes) {
     const scale = totalTimeMinutes / assignedTotal;
     results.forEach((commit) => {
       commit.timePeriodAssigned = Math.round(commit.timePeriodAssigned * scale);
-      console.log(
-        "Normalized Time for commit",
-        commit.hash,
-        ":",
-        commit.timePeriodAssigned,
-        "minutes"
-      );
     });
-  } else {
-    console.log("No normalization needed.");
   }
-  return results;
 }
 
 function processCommits(timerangeTotal, minimumTime, resultsArray) {
@@ -480,4 +651,20 @@ function processCommits(timerangeTotal, minimumTime, resultsArray) {
       TimePeriodAssigned: `${commit.timePeriodAssigned} minutes`,
     }))
   );
+}
+
+function logCommitDetails(results) {
+  console.log("Commit Time Assignments:");
+  results.forEach((commit, index) => {
+    console.log(
+      `Commit #${index + 1}: ${commit.hash} Time Assigned: ${
+        commit.timePeriodAssigned
+      } minutes`
+    );
+    // console.log(`  Hash: ${commit.hash}`);
+    // console.log(`  File Paths: [${commit.filePaths.join(", ")}]`);
+    // console.log(`  Total Insertions: ${commit.totalInsertions}`);
+    // console.log(`  Effort Percentage: ${commit.effortPercentage.toFixed(2)}%`);
+    // console.log(`  Time Assigned: ${commit.timePeriodAssigned} minutes`);
+  });
 }
