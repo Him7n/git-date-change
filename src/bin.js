@@ -331,6 +331,7 @@ function calculateNewCommitDates(results, startDate) {
     "----------------------------------------------------------------"
   );
   logCommitDetailsTable(results);
+  // askForChanges(results);
 
   // console.log(results);
 
@@ -426,9 +427,76 @@ function checkIfTimeEnough(inputTime, results, durationinInt) {
     // console.log("min time chalega!");
     return true;
   }
-  k;
 }
+// function askforChanges(results) {
 
+//   logCommitDetailsTable(results);
+// }
+async function askForChanges(results) {
+  logCommitDetailsTable(results); // Display commits with index for user reference
+
+  const { changeCommit } = await inquirer.prompt({
+    name: "changeCommit",
+    type: "confirm",
+    message: "Would you like to change a commit date?",
+  });
+
+  if (changeCommit) {
+    const { index } = await inquirer.prompt({
+      name: "index",
+      type: "number",
+      message: "Enter the index number of the commit you want to change:",
+      validate: (input) => {
+        // Check if the input is a number and within the range of the results array
+        const pass = input > 0 && input <= results.length;
+        if (pass) {
+          return true;
+        }
+        return "Please enter a valid index number!";
+      },
+    });
+
+    const { newDate } = await inquirer.prompt({
+      name: "newDate",
+      type: "input",
+      message:
+        "Enter the new date for the commit [format: ddd MMM DD HH:mm:ss YYYY ZZ]:",
+      validate: (input) => {
+        if (moment(input, "ddd MMM DD HH:mm:ss YYYY ZZ", true).isValid()) {
+          return true;
+        }
+        return "Please enter the date in the correct format: ddd MMM DD HH:mm:ss YYYY ZZ";
+      },
+    });
+
+    // Update the actualTime of the commit at the given index
+    results[index - 1].actualTime = newDate;
+
+    // Recur to ask again if further changes are desired
+    return askForChanges(results);
+  } else {
+    return results; // No more changes, return the updated results
+  }
+}
+async function makeCommitsChanges(results, path2) {
+  results.map(async (commit, index) => {
+    // console.log(commit);
+    // console.log(commit.actualTime);
+    // console.log(commit.hash);
+    // console.log(commit.timePeriodAssigned);
+    // console.log(commit.actualTime);
+    try {
+      await changeDate(
+        path2,
+        commit.hash,
+        commit.timePeriodAssigned,
+        commit.timePeriodAssigned
+      );
+    } catch (err) {
+      console.log(err);
+    }
+  });
+}
 const AskIgnore = async (Files, durationinInt, startDate) => {
   // console.log("duration in int");
   // console.log(durationinInt);
@@ -506,7 +574,7 @@ const AskIgnore = async (Files, durationinInt, startDate) => {
                       }
                     },
                   })
-                  .then((result) => {
+                  .then(async (result) => {
                     const mintime = moment(result.duration, "HH:mm:ss");
                     console.log(mintime);
                     const Mintiemsec = mintime.format("second");
@@ -543,6 +611,17 @@ const AskIgnore = async (Files, durationinInt, startDate) => {
                     // return results;
 
                     calculateNewCommitDates(results, startDate);
+                    console.log(results);
+
+                    // ask if you wanna change anything ornot??
+                    askForChanges(results).then((results) => {
+                      // makeCommitsChanges(results, path2).then((final) => {
+                      console.log("All Done?");
+                      // });
+                    });
+                    // now I gotta make the changes here
+
+                    console.log(chalkAnimation.karaoke("All Done??"));
                   });
               })
               .catch((err) => {
