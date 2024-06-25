@@ -118,8 +118,9 @@ export const CommitLOCcount = async (path) => {
 // const gitIgnoreFiles = (Files) => {};
 export const gitIgnorFiles = async (repoPath, ignoreFiles) => {
   try {
+    // Fetching commit hashes and messages in one go
     const logOutput = await execute(
-      `cd ${repoPath} && git log --pretty=format:'%H' --numstat`
+      `cd ${repoPath} && git log --pretty=format:'%H%n%s' --numstat`
     );
     if (!logOutput) {
       throw new Error("No output from git command");
@@ -128,22 +129,31 @@ export const gitIgnorFiles = async (repoPath, ignoreFiles) => {
     const lines = logOutput.split("\n");
     let commitData = {};
     let currentHash = null;
+    let expectMessage = false; // State flag to capture the next line as message
 
     lines.forEach((line) => {
       const trimmedLine = line.trim();
       if (!trimmedLine) return; // Skip empty lines
 
+      if (expectMessage) {
+        // The line following the hash is the commit message
+        commitData[currentHash].message = trimmedLine;
+        expectMessage = false; // Reset the flag
+        return;
+      }
+
       // Check if the line is a commit hash
       if (trimmedLine.length === 40 && !/\t/.test(trimmedLine)) {
         currentHash = trimmedLine;
-        if (!commitData[currentHash]) {
-          commitData[currentHash] = {
-            hash: currentHash,
-            filePaths: [],
-            totalInsertions: 0,
-          };
-        }
-      } else {
+        expectMessage = true; // Set flag to capture the next line as the message
+        commitData[currentHash] = {
+          hash: currentHash,
+          message: "", // Initialize the message to be filled in the next line
+          filePaths: [],
+          totalInsertions: 0,
+        };
+      } else if (!expectMessage && trimmedLine.includes("\t")) {
+        // Ensure it's a numstat line
         const lineParts = trimmedLine.split("\t");
         if (lineParts.length === 3) {
           const [insertions, , filePath] = lineParts;
@@ -158,10 +168,16 @@ export const gitIgnorFiles = async (repoPath, ignoreFiles) => {
       }
     });
 
+    // Calculate the total insertions for effort percentage calculation
+    const totalInsertions = Object.values(commitData).reduce(
+      (acc, commit) => acc + commit.totalInsertions,
+      0
+    );
+
+    // Add effort percentage to each commit
     const results = Object.values(commitData).map((commit) => ({
       ...commit,
-      effortPercentage:
-        (commit.totalInsertions / totalInsertions(commitData)) * 100,
+      effortPercentage: (commit.totalInsertions / totalInsertions) * 100,
     }));
 
     return results;
@@ -169,6 +185,30 @@ export const gitIgnorFiles = async (repoPath, ignoreFiles) => {
     throw err;
   }
 };
+// const execute = require("child_process").execSync; // If you're using Node.js to execute shell commands
+
+async function addCommitMessages(results, repoPath) {
+  // Iterate over each commit in the results
+  for (let commit of results) {
+    try {
+      // Fetch the commit message for the given commit hash
+      const command = `git log -1 --format=%B ${commit.hash}`;
+      const commitMessageOutput = execute(command).toString().trim();
+
+      // Add the commit message to the commit object
+      commit.message = commitMessageOutput;
+    } catch (error) {
+      console.error(
+        `Error fetching commit message for hash ${commit.hash}:`,
+        error
+      );
+      // Optionally set a default message or handle the error as needed
+      commit.message = "Commit message unavailable";
+    }
+  }
+
+  return results;
+}
 
 function isIgnored(filePath, ignoreFiles) {
   return ignoreFiles.some((ignoreFile) => filePath.includes(ignoreFile));
@@ -188,6 +228,10 @@ export const gitIgnoreFiles = async (repoPath, Files) => {
     console.log("Repo path which  was passed", repoPath);
     // const normalizedIgnoreFiles = normalizePaths(repoPath, Files);
     const results = await gitIgnorFiles(repoPath, Files);
+    console.log(results);
+    ///addign the names
+    // const results2 = await addCommitMessages(results, repoPath);
+    // console.log(results2);
     return results;
   } catch (err) {
     throwError(err);

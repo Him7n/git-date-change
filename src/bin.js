@@ -259,7 +259,15 @@ welcome();
 
 const logCommitDetailsTable = (commits) => {
   const table = new Table({
-    head: ["No.", "Hash", "Insertions", "Effort", "Time Assigned", "Date"],
+    head: [
+      "No.",
+      "Hash",
+      "Name",
+      "Insertions",
+      "Effort",
+      "Time Assigned",
+      "Date",
+    ],
     chars: {
       top: "",
       "top-mid": "",
@@ -283,6 +291,7 @@ const logCommitDetailsTable = (commits) => {
     ...commits.map((commit, index) => [
       index + 1,
       `${commit.hash}`,
+      commit.message?.slice(0, 40),
       commit.totalInsertions,
 
       commit.effortPercentage.toString().slice(0, 4),
@@ -322,7 +331,8 @@ function calculateNewCommitDates(results, startDate) {
     "----------------------------------------------------------------"
   );
   logCommitDetailsTable(results);
-  console.log(results);
+
+  // console.log(results);
 
   return results; // Return the updated results with the actual commit times
 }
@@ -685,14 +695,6 @@ function normalizeTimeAssignments(
   );
 }
 
-function calculateOffset(index, totalCommits) {
-  // Offset reduces as the index increases, providing variability
-  const maxOffsetPercentage = 0.01; // 1% of the total time
-  return Math.floor(
-    (totalCommits - index) * maxOffsetPercentage * totalCommits
-  );
-}
-
 // function normalizeTimeAssignments(results, totalTimeMinutes) {
 //   const assignedTotal = results.reduce(
 //     (acc, commit) => acc + commit.timePeriodAssigned,
@@ -724,36 +726,3 @@ function calculateOffset(index, totalCommits) {
 //     });
 //   }
 // }
-
-function processCommits(timerangeTotal, minimumTime, resultsArray) {
-  const processedResults = assignTimePeriods(
-    resultsArray,
-    timerangeTotal,
-    minimumTime
-  );
-  console.table(
-    processedResults.map((commit, index) => ({
-      IndexNo: index + 1,
-      CommitHash: commit.hash,
-      LinesInserted: commit.totalInsertions,
-      Effort: `${commit.effortPercentage.toFixed(2)}%`,
-      TimePeriodAssigned: `${commit.timePeriodAssigned} minutes`,
-    }))
-  );
-}
-
-function logCommitDetails(results) {
-  console.log("Commit Time Assignments:");
-  results.forEach((commit, index) => {
-    console.log(
-      `Commit #${index + 1}: ${commit.hash} Time Assigned: ${
-        commit.timePeriodAssigned
-      } minutes`
-    );
-    // console.log(`  Hash: ${commit.hash}`);
-    // console.log(`  File Paths: [${commit.filePaths.join(", ")}]`);
-    // console.log(`  Total Insertions: ${commit.totalInsertions}`);
-    // console.log(`  Effort Percentage: ${commit.effortPercentage.toFixed(2)}%`);
-    // console.log(`  Time Assigned: ${commit.timePeriodAssigned} minutes`);
-  });
-}
