@@ -615,9 +615,9 @@ const AskIgnore = async (Files, durationinInt, startDate) => {
 
                     // ask if you wanna change anything ornot??
                     askForChanges(results).then((results) => {
-                      // makeCommitsChanges(results, path2).then((final) => {
-                      console.log("All Done?");
-                      // });
+                      makeCommitsChanges(results, path2).then((final) => {
+                        console.log("All Done?");
+                      });
                     });
                     // now I gotta make the changes here
 
