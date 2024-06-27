@@ -225,10 +225,10 @@ export const gitIgnoreFiles = async (repoPath, Files) => {
   try {
     // Get the repository root path to ensure paths are relative to it
     // const repoRoot = await getRepoRoot(repoPath);
-    console.log("Repo path which  was passed", repoPath);
+    // console.log("Repo path which  was passed", repoPath);
     // const normalizedIgnoreFiles = normalizePaths(repoPath, Files);
     const results = await gitIgnorFiles(repoPath, Files);
-    console.log(results);
+    // console.log(results);
     ///addign the names
     // const results2 = await addCommitMessages(results, repoPath);
     // console.log(results2);

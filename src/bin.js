@@ -88,7 +88,7 @@ If you don't see formatted output, try to increase width of the terminal to have
     {
       type: "list",
       name: "Method",
-      message: "Which method do you want to execute?",
+      message: chalk.redBright("Which method do you want to execute?"),
       choices: ["Manual", "Automatic [From Time Range]"],
       filter(val) {
         if (val.toLowerCase() === "manual") {
@@ -102,7 +102,9 @@ If you don't see formatted output, try to increase width of the terminal to have
   inquirer.prompt(question).then((answers) => {
     if (!answers.Method) {
       // chalk.BackgroundColor("Here we go");
-      const auto = chalkAnimation.rainbow("Here we go Ill remove this line");
+      const auto = chalkAnimation.rainbow(
+        "Make sure you dont have any unstaged changes, Press any key to continue ..."
+      );
       setTimeout(() => {
         auto.stop();
       }, 1000);
@@ -328,14 +330,102 @@ function calculateNewCommitDates(results, startDate) {
   });
 
   console.log(
-    "----------------------------------------------------------------"
+    "-----------------------------------------------------------------------------------"
   );
-  logCommitDetailsTable(results);
+  // logCommitDetailsTable(results);
   // askForChanges(results);
 
   // console.log(results);
 
   return results; // Return the updated results with the actual commit times
+}
+async function gitIgnoreFilesAndAskDuration(Files, durationinInt, startDate) {
+  const path2 = argv.path || process.cwd();
+  gitIgnoreFiles(path2, Files)
+    .then((results) => {
+      // console.log("Filtered Commit Insertions:", results);
+
+      // Ask for Minimum Time-span for the Commit
+      inquirer
+        .prompt({
+          type: "input",
+          name: "duration",
+          message:
+            chalk.yellowBright(
+              "What is the minimum commit time range that you want to assign to a commit?"
+            ) + " [ex. 02:45:44 ]",
+          prefix: " 🌎 ",
+          transformer: (s) => chalk.bold.greenBright(s),
+          validate: (input) => {
+            const format = "HH:mm:ss"; // Define the expected format
+            if (moment(input, format, true).isValid()) {
+              if (!checkIfTimeEnough(input, results, durationinInt)) {
+                let noofCommits = results.length;
+                return `The minimum time required should be less than ${Math.floor(
+                  durationinInt / noofCommits
+                )} seconds.`;
+
+                // return false;
+              } else {
+                return true;
+              }
+            } else {
+              return `Please enter the time in the correct format: ${format}`;
+            }
+          },
+        })
+        .then(async (result) => {
+          const mintime = moment(result.duration, "HH:mm:ss");
+          // console.log(mintime);
+          const Mintiemsec = mintime.format("second");
+          // console.log(
+          //   "Min time isn secodns thru the format --------",
+          //   Mintiemsec
+          // );
+          // console.log(results.length);
+          const timeString = result.duration; // "HH:mm:ss"
+          const parts = timeString.split(":");
+          const hours = parseInt(parts[0], 10);
+          const minutes = parseInt(parts[1], 10);
+          const seconds = parseInt(parts[2], 10);
+
+          const minSec = Math.floor(hours * 60 * 60 + minutes * 60 + seconds);
+
+          // console.log("Total Minutes:", Math.floor(totalMinutes));
+          const minTimeMinutes = mintime.format("seconds");
+          // console.log(minTimeMinutes);
+
+          // const totalMinutes = console.log(totalMinutes);
+          // console.log(
+          //   durationinInt,
+          //   "this should be in minutes why undefined"
+          // );
+          // console.log(
+          //   "min seconds for each commmit thu the calculation ",
+          //   minSec
+          // );
+          assignTimePeriods(results, durationinInt, minSec);
+          //returnign the results ;
+          // return results;
+
+          calculateNewCommitDates(results, startDate);
+          // console.log(results);
+
+          // ask if you wanna change anything ornot??
+          askForChanges(results).then((results) => {
+            makeCommitsChanges(results, path2).then((final) => {
+              console.log("All Done?");
+              console.log(chalk.magentaBright("Sayonara !!!"));
+            });
+          });
+          // now I gotta make the changes here
+
+          // console.log(chalkAnimation.karaoke("All Done??"));
+        });
+    })
+    .catch((err) => {
+      console.error("Error processing commits:", err);
+    });
 }
 
 async function TimeRange() {
@@ -346,7 +436,9 @@ async function TimeRange() {
     .prompt({
       type: "input",
       name: "startDate",
-      message: "Enter StartDate [ex. Thu Jun 20 17:45:44 2024 +0530]",
+      message:
+        chalk.yellowBright("Enter StartDate") +
+        " [ex. Thu Jun 20 17:45:44 2024 +0530]",
       prefix: " 🌎 ",
       transformer: (s) => chalk.bold.greenBright(s),
       validate: (input) => {
@@ -354,7 +446,9 @@ async function TimeRange() {
         if (moment(input, format, true).isValid()) {
           return true;
         } else {
-          return `Please enter the date in the correct format: ${format}`;
+          return chalk.redBright(
+            `Please enter the date in the correct format: ${format}`
+          );
         }
       },
     })
@@ -365,7 +459,9 @@ async function TimeRange() {
         .prompt({
           type: "input",
           name: "endDate",
-          message: "Enter EndDate [ex. Thu Jun 20 17:45:44 2024 +0530]",
+          message:
+            chalk.yellowBright("Enter EndDate") +
+            " [ex. Thu Jun 20 17:45:44 2024 +0530]",
           prefix: " 🌎 ",
           transformer: (s) => chalk.bold.greenBright(s),
           validate: (input) => {
@@ -373,32 +469,72 @@ async function TimeRange() {
             if (moment(input, format, true).isValid()) {
               return true;
             } else {
-              return `Please enter the date in the correct format: ${format}`;
+              return chalk.redBright(
+                `Please enter the date in the correct format: ${format}`
+              );
             }
           },
         })
         .then(async (ans) => {
           endDate = moment(ans.endDate, "ddd MMM DD HH:mm:ss YYYY ZZ");
           const duration = endDate.diff(startDate, "seconds");
-          console.log(endDate.add(duration, "seconds"));
-          console.log(
-            `Added the duration in the EndDate and Displayed it in Date Format ${endDate}`
-          );
-          // console.log(`format it ${endDate.format("minutes")}}`);
+          // console.log(endDate.add(duration, "seconds"));
+          // console.log(
+          //   `Added the duration in the EndDate and Displayed it in Date Format ${endDate}`
+          // );
+          // // console.log(`format it ${endDate.format("minutes")}}`);
           // console.log(parseInt(duration));
           const durationinInt = parseInt(duration);
-          console.log(typeof durationinInt);
-          console.log(`it is supposed to be undefined ${durationinInt}`);
+          // console.log(typeof durationinInt);
+          // console.log(`it is supposed to be undefined ${durationinInt}`);
 
-          chalkAnimation.neon(endDate.toString()).start();
+          // chalkAnimation.neon(endDate.toString()).start();
 
-          console.log(
-            `The difference between the two dates is ${duration} minutes.`
-          );
-          console.log("Which files/folders commits should be excuded ?");
-          const Files = [];
-          const result = await AskIgnore(Files, durationinInt, startDate);
-          console.log("result is showing undefined");
+          // console.log(
+          //   `The difference between the two dates is ${duration} minutes.`
+          // );
+
+          inquirer
+            .prompt({
+              type: "confirm",
+              name: "another",
+              message: chalk.yellowBright(
+                "Do you want to ignore any File/Folder changes ?"
+              ),
+              default: false,
+              prefix: "  ",
+              // transformer: (s) => chalk.bold.bgRedBright(s),
+            })
+            .then(async (ans) => {
+              // console.log(ans.another);
+
+              // Check the user's response and react accordingly
+              if (ans.another) {
+                // console.log(chalk.magentaBright("Adding another file..."));
+                // AskIgnore(Files, durationinInt, startDate); // Call the function again to add more files
+                console.log(
+                  chalk.yellowBright(
+                    "Which files/folders commits should be excuded ?"
+                  )
+                );
+                const Files = [];
+                const result = await AskIgnore(Files, durationinInt, startDate);
+              } else {
+                console.log(chalk.redBright("No more files to add."));
+                const Files = [];
+                gitIgnoreFilesAndAskDuration(Files, durationinInt, startDate);
+                // console.log(
+                //   chalk.yellowBright(
+                //     "Final list of files/folders to be ignored:"
+                //   ),
+                //   Files
+                // );
+              }
+            });
+
+          // console.log("Which files/folders commits should be excuded ?");
+
+          // console.log("result is showing undefined");
           // there is  a problem with the closure /async so Ill continue at the calling funcitnon
         });
     });
@@ -409,7 +545,7 @@ function checkIfTimeEnough(inputTime, results, durationinInt) {
   const hours = parseInt(parts[0], 10);
   const minutes = parseInt(parts[1], 10);
   const seconds = parseInt(parts[2], 10);
-  console.log(results);
+  // console.log(results);
   const minsecs = hours * 3600 + minutes * 60 + seconds;
   const noofCommits = results.length;
   const totalInputSeconds = noofCommits * minsecs;
@@ -418,10 +554,10 @@ function checkIfTimeEnough(inputTime, results, durationinInt) {
 
   // Check if the entered time is enough
   if (totalInputSeconds >= minimumRequiredSeconds) {
-    console.error(
-      "The minimum time required should be less than",
-      Math.floor(durationinInt / noofCommits)
-    );
+    // console.error(
+    //   "The minimum time required should be less than",
+    //   Math.floor(durationinInt / noofCommits)
+    // );
     return false;
   } else {
     // console.log("min time chalega!");
@@ -438,21 +574,23 @@ async function askForChanges(results) {
   const { changeCommit } = await inquirer.prompt({
     name: "changeCommit",
     type: "confirm",
-    message: "Would you like to change a commit date?",
+    message: chalk.yellowBright("Would you like to change a commit date?"),
   });
 
   if (changeCommit) {
     const { index } = await inquirer.prompt({
       name: "index",
       type: "number",
-      message: "Enter the index number of the commit you want to change:",
+      message: chalk.yellowBright(
+        "Enter the index number of the commit you want to change:"
+      ),
       validate: (input) => {
         // Check if the input is a number and within the range of the results array
         const pass = input > 0 && input <= results.length;
         if (pass) {
           return true;
         }
-        return "Please enter a valid index number!";
+        return chalk.redBright("Please enter a valid index number!");
       },
     });
 
@@ -478,25 +616,125 @@ async function askForChanges(results) {
     return results; // No more changes, return the updated results
   }
 }
-async function makeCommitsChanges(results, path2) {
-  results.map(async (commit, index) => {
-    // console.log(commit);
-    // console.log(commit.actualTime);
-    // console.log(commit.hash);
-    // console.log(commit.timePeriodAssigned);
-    // console.log(commit.actualTime);
-    try {
-      await changeDate(
-        path2,
-        commit.hash,
-        commit.timePeriodAssigned,
-        commit.timePeriodAssigned
-      );
-    } catch (err) {
-      console.log(err);
+export const makeCommitsChanges = async (results, path2) => {
+  try {
+    // await stashChanges(path2); // Stash changes at the start
+
+    for (const commit of results) {
+      try {
+        console.log(
+          "Changing the date of the commit ",
+          chalk.bold.italic.magenta(commit.message)
+        );
+        let str = "Please wait...";
+        const rainbow = chalkAnimation.rainbow(str);
+
+        // Add a new dot every second
+        setInterval(() => {
+          rainbow.replace((str += "."));
+        }, 1000);
+        await changeDate(
+          path2,
+          commit.hash,
+          commit.actualTime, // Assuming you want to change the actualTime
+          commit.actualTime // Using the same time for both author and committer date
+        );
+        console.log(
+          chalk.greenBright.bold.italic(
+            `Changed date for commit ${commit.message} successfully !`
+          )
+        );
+      } catch (err) {
+        console.error(`Error changing date for commit ${commit.hash}:`, err);
+        break; // Break the loop if an error occurs
+      }
     }
-  });
-}
+
+    // await popStash(path2); // Pop stash at the end
+  } catch (err) {
+    console.error("Error during commit changes:", err);
+  }
+};
+const askMinCommitTime = async (results) => {
+  // console.log("Filtered Commit Insertions:", results);
+
+  // Ask for Minimum Time-span for the Commit
+  inquirer
+    .prompt({
+      type: "input",
+      name: "duration",
+      message:
+        chalk.yellowBright(
+          "What is the minimum commit time range that you want to assign to a commit?"
+        ) + " [ex. 02:45:44 ]",
+      prefix: " 🌎 ",
+      transformer: (s) => chalk.bold.greenBright(s),
+      validate: (input) => {
+        const format = "HH:mm:ss"; // Define the expected format
+        if (moment(input, format, true).isValid()) {
+          if (!checkIfTimeEnough(input, results, durationinInt)) {
+            let noofCommits = results.length;
+            return `The minimum time required should be less than ${Math.floor(
+              durationinInt / noofCommits
+            )} seconds.`;
+
+            // return false;
+          } else {
+            return true;
+          }
+        } else {
+          return `Please enter the time in the correct format: ${format}`;
+        }
+      },
+    })
+    .then(async (result) => {
+      const mintime = moment(result.duration, "HH:mm:ss");
+      // console.log(mintime);
+      const Mintiemsec = mintime.format("second");
+      // console.log(
+      //   "Min time isn secodns thru the format --------",
+      //   Mintiemsec
+      // );
+      // console.log(results.length);
+      const timeString = result.duration; // "HH:mm:ss"
+      const parts = timeString.split(":");
+      const hours = parseInt(parts[0], 10);
+      const minutes = parseInt(parts[1], 10);
+      const seconds = parseInt(parts[2], 10);
+
+      const minSec = Math.floor(hours * 60 * 60 + minutes * 60 + seconds);
+
+      // console.log("Total Minutes:", Math.floor(totalMinutes));
+      const minTimeMinutes = mintime.format("seconds");
+      // console.log(minTimeMinutes);
+
+      // const totalMinutes = console.log(totalMinutes);
+      // console.log(
+      //   durationinInt,
+      //   "this should be in minutes why undefined"
+      // );
+      // console.log(
+      //   "min seconds for each commmit thu the calculation ",
+      //   minSec
+      // );
+      assignTimePeriods(results, durationinInt, minSec);
+      //returnign the results ;
+      // return results;
+
+      calculateNewCommitDates(results, startDate);
+      // console.log(results);
+
+      // ask if you wanna change anything ornot??
+      askForChanges(results).then((results) => {
+        makeCommitsChanges(results, path2).then((final) => {
+          console.log("All Done?");
+        });
+      });
+      // now I gotta make the changes here
+
+      // console.log(chalkAnimation.karaoke("All Done??"));
+    });
+};
 const AskIgnore = async (Files, durationinInt, startDate) => {
   // console.log("duration in int");
   // console.log(durationinInt);
@@ -514,38 +752,43 @@ const AskIgnore = async (Files, durationinInt, startDate) => {
       },
     ])
     .then((answers) => {
-      console.log(JSON.stringify(answers));
-      console.log(answers);
+      // console.log(JSON.stringify(answers));
+      // console.log(answers);
       // here remove the path from the answers.Files path
       // console.log(JSON.stringify(answers.files));
       const relativeFilePath = path.relative(path2, answers.file);
-      console.log(relativeFilePath);
+      // console.log(relativeFilePath);
       // path is a the path fo the repository and the answers.file is the absolute path
       Files.push(relativeFilePath);
-      console.log(Files);
+      // console.log(Files);
       inquirer
         .prompt({
           type: "confirm",
           name: "another",
-          message: "Do you want to add another file/folder to be ignored?",
+          message: chalk.yellowBright(
+            "Do you want to add another file/folder to be ignored"
+          ),
           default: false,
-          prefix: " 🌎 ",
+          prefix: "  ",
           // transformer: (s) => chalk.bold.bgRedBright(s),
         })
         .then((ans) => {
-          console.log(ans.another);
+          // console.log(ans.another);
 
           // Check the user's response and react accordingly
           if (ans.another) {
-            console.log("Adding another file...");
+            console.log(chalk.magentaBright("Adding another file..."));
             AskIgnore(Files, durationinInt, startDate); // Call the function again to add more files
           } else {
-            console.log("No more files to add.");
-            console.log("Final list of files/folders to be ignored:", Files);
+            console.log(chalk.redBright("No more files to add."));
+            console.log(
+              chalk.yellowBright("Final list of files/folders to be ignored:"),
+              Files
+            );
             // console.log(__dirname);
             gitIgnoreFiles(path2, Files)
               .then((results) => {
-                console.log("Filtered Commit Insertions:", results);
+                // console.log("Filtered Commit Insertions:", results);
 
                 // Ask for Minimum Time-span for the Commit
                 inquirer
@@ -553,7 +796,9 @@ const AskIgnore = async (Files, durationinInt, startDate) => {
                     type: "input",
                     name: "duration",
                     message:
-                      "Enter EndDate [ex. Thu Jun 20 17:45:44 2024 +0530]",
+                      chalk.yellowBright(
+                        "What is the minimum commit time range that you want to assign to a commit?"
+                      ) + " [ex. 02:45:44 ]",
                     prefix: " 🌎 ",
                     transformer: (s) => chalk.bold.greenBright(s),
                     validate: (input) => {
@@ -576,12 +821,12 @@ const AskIgnore = async (Files, durationinInt, startDate) => {
                   })
                   .then(async (result) => {
                     const mintime = moment(result.duration, "HH:mm:ss");
-                    console.log(mintime);
+                    // console.log(mintime);
                     const Mintiemsec = mintime.format("second");
-                    console.log(
-                      "Min time isn secodns thru the format --------",
-                      Mintiemsec
-                    );
+                    // console.log(
+                    //   "Min time isn secodns thru the format --------",
+                    //   Mintiemsec
+                    // );
                     // console.log(results.length);
                     const timeString = result.duration; // "HH:mm:ss"
                     const parts = timeString.split(":");
@@ -598,20 +843,20 @@ const AskIgnore = async (Files, durationinInt, startDate) => {
                     console.log(minTimeMinutes);
 
                     // const totalMinutes = console.log(totalMinutes);
-                    console.log(
-                      durationinInt,
-                      "this should be in minutes why undefined"
-                    );
-                    console.log(
-                      "min seconds for each commmit thu the calculation ",
-                      minSec
-                    );
+                    // console.log(
+                    //   durationinInt,
+                    //   "this should be in minutes why undefined"
+                    // );
+                    // console.log(
+                    //   "min seconds for each commmit thu the calculation ",
+                    //   minSec
+                    // );
                     assignTimePeriods(results, durationinInt, minSec);
                     //returnign the results ;
                     // return results;
 
                     calculateNewCommitDates(results, startDate);
-                    console.log(results);
+                    // console.log(results);
 
                     // ask if you wanna change anything ornot??
                     askForChanges(results).then((results) => {
@@ -621,7 +866,7 @@ const AskIgnore = async (Files, durationinInt, startDate) => {
                     });
                     // now I gotta make the changes here
 
-                    console.log(chalkAnimation.karaoke("All Done??"));
+                    // console.log(chalkAnimation.karaoke("All Done??"));
                   });
               })
               .catch((err) => {
@@ -726,8 +971,8 @@ function assignTimePeriods(results, totalTimeMinutes, minimumTimeMinutes) {
       minimumTimeMinutes
     ); // Ensure not below minimum
   });
-  console.log("Before Normalisation");
-  console.log(results);
+  // console.log("Before Normalisation");
+  // console.log(results);
   // logCommitDetailsTable(results)
 
   normalizeTimeAssignments(results, totalTimeMinutes, minimumTimeMinutes);
@@ -744,7 +989,7 @@ function normalizeTimeAssignments(
     0
   );
   let excessTime = assignedTotal - totalTimeMinutes;
-  console.log(excessTime);
+  // console.log(excessTime);
   if (excessTime > 0) {
     // We need to reduce the total assigned time
     // Sort results in descending order based on time assigned
@@ -770,7 +1015,9 @@ function normalizeTimeAssignments(
     }
   }
   console.log(
-    "Normalization complete. Total time is now adjusted to fit within the limit."
+    chalk.magenta(
+      "Normalization complete. Total time is now adjusted to fit within the limit."
+    )
   );
 }
 
