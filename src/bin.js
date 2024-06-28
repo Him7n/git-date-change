@@ -17,6 +17,8 @@ import moment from "moment";
 import inquirerFileTreeSelection from "inquirer-file-tree-selection-prompt";
 const argv = minimist(process.argv.slice(2));
 import path from "path";
+
+//here goes nothing
 import * as url from "node:url";
 const __filename = url.fileURLToPath(import.meta.url);
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
@@ -89,18 +91,25 @@ If you don't see formatted output, try to increase width of the terminal to have
       type: "list",
       name: "Method",
       message: chalk.redBright("Which method do you want to execute?"),
-      choices: ["Manual", "Automatic [From Time Range]"],
+      choices: [
+        "Manual",
+        "Automatic : [Time Range LOC]",
+        "Automatic-AI :[Time Range]",
+      ],
       filter(val) {
         if (val.toLowerCase() === "manual") {
-          return true;
+          return 1;
+        } else if (val.toLowerCase() === "automatic : [time range loc]") {
+          return 2;
         } else {
-          return false;
+          return console.log(chalk.red.bold.italic("Feature Comming Soon"));
         }
       },
     },
   ];
   inquirer.prompt(question).then((answers) => {
-    if (!answers.Method) {
+    // console.log(answers.Method);
+    if (answers.Method == 2) {
       // chalk.BackgroundColor("Here we go");
       const auto = chalkAnimation.rainbow(
         "Make sure you dont have any unstaged changes, Press any key to continue ..."
@@ -110,7 +119,7 @@ If you don't see formatted output, try to increase width of the terminal to have
       }, 1000);
 
       TimeRange();
-    } else {
+    } else if (answers.Method == 1) {
       try {
         start({
           count: argv.count || 5,
@@ -123,8 +132,13 @@ If you don't see formatted output, try to increase width of the terminal to have
         });
       } catch (err) {
         console.log(err);
-        chalkAnimation.rainbow("Sayonara...");
+        chalkAnimation.rainbow("Sayonara...").start();
       }
+    } else {
+      return console.log(chalk.red.bold.italic("Feature Comming Soon"));
+      // return process.exit(0);
+
+      // chalkAnimation.rainbow("Feature Comming Soon...");
     }
   });
 };
@@ -414,8 +428,9 @@ async function gitIgnoreFilesAndAskDuration(Files, durationinInt, startDate) {
           // ask if you wanna change anything ornot??
           askForChanges(results).then((results) => {
             makeCommitsChanges(results, path2).then((final) => {
-              console.log("All Done?");
+              // console.log("All Done?");
               console.log(chalk.magentaBright("Sayonara !!!"));
+              return;
             });
           });
           // now I gotta make the changes here
@@ -645,14 +660,15 @@ export const makeCommitsChanges = async (results, path2) => {
           )
         );
       } catch (err) {
-        console.error(`Error changing date for commit ${commit.hash}:`, err);
+        console.error(`Error changing date for commit ${commit.hash}`);
+        console.log(chalk.bold.blue.italic(err));
         break; // Break the loop if an error occurs
       }
     }
 
     // await popStash(path2); // Pop stash at the end
   } catch (err) {
-    console.error("Error during commit changes:", err);
+    // console.error("Error during commit changes:", err);
   }
 };
 const askMinCommitTime = async (results) => {
