@@ -48,13 +48,6 @@ export const formatGitDate = (date) => {
   return momentDate.format("ddd MMM DD HH:mm:ss YYYY ZZ");
 };
 
-
-
-
-
-
-
-
 export const changeDate = async (repoPath, hash, authorDate, committerDate) => {
   try {
     const authorDateFormatted = formatGitDate(authorDate);
@@ -98,14 +91,13 @@ export const changeDate = async (repoPath, hash, authorDate, committerDate) => {
       return { stdout, stderr };
     } else {
       // Unix approach
-      const filterBranchCommand = `cd ${repoPath} && GIT_COMMIT=${hash} GIT_AUTHOR_DATE="${authorDateFormatted}" GIT_COMMITTER_DATE="${committerDateFormatted}" git filter-branch -f --env-filter "if [ \\$GIT_COMMIT = ${hash} ]; then export GIT_AUTHOR_DATE=\\"${authorDateFormatted}\\"; export GIT_COMMITTER_DATE=\\"${committerDateFormatted}\\"; fi"`
+      const filterBranchCommand = `cd ${repoPath} && GIT_COMMIT=${hash} GIT_AUTHOR_DATE="${authorDateFormatted}" GIT_COMMITTER_DATE="${committerDateFormatted}" git filter-branch -f --env-filter "if [ \\$GIT_COMMIT = ${hash} ]; then export GIT_AUTHOR_DATE=\\"${authorDateFormatted}\\"; export GIT_COMMITTER_DATE=\\"${committerDateFormatted}\\"; fi"`;
 
-
-      console.log(`Executing command: ${filterBranchCommand}`);
+      // console.log(`Executing command: ${filterBranchCommand}`);
       const { stdout, stderr } = await exec(filterBranchCommand);
 
-      console.log(`Command stdout: ${stdout}`);
-      console.log(`Command stderr: ${stderr}`);
+      // console.log(`Command stdout: ${stdout}`);
+      // console.log(`Command stderr: ${stderr}`);
 
       return { stdout, stderr };
     }
