@@ -281,6 +281,8 @@ const start = async (filter) => {
         throw new Error(`Number must be between 1 and ${commits.length}`);
       }
       commit = commits[number - 1];
+      // console.log(chalk.chalkAnimation())
+      chalkAnimation.rainbow("Please wait...").start()
       return changeDate(dirPath, commit.hash, date, date);
     })
     .then(() => {
@@ -417,7 +419,7 @@ async function gitIgnoreFilesAndAskDuration(Files, durationinInt, startDate) {
         .then(async (result) => {
           const mintime = moment(result.duration, "HH:mm:ss");
           // console.log(mintime);
-          const Mintiemsec = mintime.format("second");
+          // const Mintiemsec = mintime.format("second");
           // console.log(
           //   "Min time isn secodns thru the format --------",
           //   Mintiemsec
@@ -432,7 +434,7 @@ async function gitIgnoreFilesAndAskDuration(Files, durationinInt, startDate) {
           const minSec = Math.floor(hours * 60 * 60 + minutes * 60 + seconds);
 
           // console.log("Total Minutes:", Math.floor(totalMinutes));
-          const minTimeMinutes = mintime.format("seconds");
+          // const minTimeMinutes = mintime.format("seconds");
           // console.log(minTimeMinutes);
 
           // const totalMinutes = console.log(totalMinutes);
@@ -668,7 +670,7 @@ export const makeCommitsChanges = async (results, path2) => {
           chalk.bold.italic.magenta(commit.message)
         );
         let str = "Please wait...";
-        const rainbow = chalkAnimation.rainbow(str);
+        const rainbow = chalkAnimation.rainbow(str).start()
 
         // Add a new dot every second
         setInterval(() => {
@@ -686,7 +688,7 @@ export const makeCommitsChanges = async (results, path2) => {
           )
         );
       } catch (err) {
-        console.error(`Error changing date for commit ${commit.hash}`);
+        console.error(`Error changing date for commit `, chalk.red.bold(commit.message));
         console.log(chalk.bold.blue.italic(err));
         break; // Break the loop if an error occurs
       }

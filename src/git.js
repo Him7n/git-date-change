@@ -2,10 +2,14 @@ import moment from "moment";
 import throwError from "./errors/throwError.js";
 import gitLogConverter from "./gitLogConverter.js";
 import execute from "./execute.js";
+import { exec as execCallback } from "child_process";
+import { promisify } from "util";
 import path from "path";
-// import UnstagedChangesError from "./errors/UnstagedChangesError.js";
+const exec = promisify(execCallback);
+
 
 moment.suppressDeprecationWarnings = true;
+
 const getRepoRoot = async (repoPath) => {
   try {
     const { stdout } = await execute("git rev-parse --show-toplevel", {
@@ -17,14 +21,13 @@ const getRepoRoot = async (repoPath) => {
   }
 };
 
-// Function to normalize file paths to be relative to the repository root
 const normalizePaths = (repoRoot, filePaths) => {
   return filePaths.map((filePath) => {
-    // Make the path relative to the repository root
     const relativePath = path.relative(repoRoot, filePath);
-    return relativePath.replace(/\\/g, "/"); // Convert backslashes to forward slashes for Unix compatibility
+    return relativePath.replace(/\\/g, "/");
   });
 };
+
 export const getCommits = async (path, { count, hash }) => {
   let commitLog;
 
@@ -44,30 +47,50 @@ export const formatGitDate = (date) => {
   return momentDate.format("ddd MMM DD HH:mm:ss YYYY ZZ");
 };
 
-export const changeDate = async (path, hash, authorDate, committerDate) => {
+export const changeDate = async (repoPath, hash, authorDate, committerDate) => {
   try {
     const authorDateFormatted = formatGitDate(authorDate);
     const committerDateFormatted = formatGitDate(committerDate);
 
+    // console.log(
+    //   `Changing date for commit ${hash}`
+    // );
+
     // Check for unstaged changes before running the command
-    const { stdout: statusOutput } = await execute(
-      `cd ${path} && git status --porcelain`
+    const { stdout: statusOutput } = await exec(
+      `cd ${repoPath} && git status --porcelain`
     );
     if (statusOutput) {
-      throwError(new Error("DATE_INVALID"));
+      // console.log("unstaged changes")
+      throwError(new Error("unstaged changes"));
+      // throw new Error("DATE_INVALID: Unstaged changes present");
     }
 
-    return await execute(`cd ${path} && git filter-branch -f --env-filter \
-    'if [ $GIT_COMMIT = ${hash} ]
-     then
-         export GIT_AUTHOR_DATE="${authorDateFormatted}"
-         export GIT_COMMITTER_DATE="${committerDateFormatted}"
-     fi'`);
+    const command = `git filter-branch -f --env-filter " \
+      if [ $GIT_COMMIT = ${hash} ]; then \
+      export GIT_AUTHOR_DATE='${authorDateFormatted}'; \
+      export GIT_COMMITTER_DATE='${committerDateFormatted}'; \
+      fi"`;
+
+    const filterBranchCommand = process.platform === "win32"
+      ? `cd ${repoPath} && set GIT_COMMIT=${hash} && set GIT_AUTHOR_DATE=${authorDateFormatted} && set GIT_COMMITTER_DATE=${committerDateFormatted} && ${command}`
+      : `cd ${repoPath} && ${command}`;
+
+    // console.log(`Executing command: ${filterBranchCommand}`);
+    return await exec(filterBranchCommand);
   } catch (err) {
-    return throwError(err);
+    // console.error("Error changing date:", err);
+    throw err;
   }
 };
 
+// const formatGitDate = (date) => {
+//   const momentDate = moment(date, "ddd MMM DD HH:mm:ss YYYY ZZ", true);
+//   if (!momentDate.isValid()) {
+//     throwError(new Error("DATE_INVALID"));
+//   }
+//   return momentDate.toISOString();
+// };
 export const CommitLOCcount = async (path) => {
   try {
     const logOutput = await execute(
@@ -77,18 +100,14 @@ export const CommitLOCcount = async (path) => {
       throwError(new Error("No output from git command"));
     }
 
-    // Split the output into lines and handle them carefully
-    const lines = logOutput.split("\n").filter((line) => line.trim() !== ""); // Filter out any empty lines
+    const lines = logOutput.split("\n").filter((line) => line.trim() !== "");
 
     let totalInsertions = 0;
     const commitData = [];
 
-    // Loop through the lines and assume that every even index line (0, 2, 4, ...) is a commit hash
     for (let i = 0; i < lines.length; i += 2) {
       const commitHash = lines[i].trim();
-      // insertion lines are the odd ones
       if (commitHash.length === 40 && i + 1 < lines.length) {
-        // Check if next line exists
         const statsLine = lines[i + 1].trim();
         const match = /(\d+) insertion/.exec(statsLine);
 
@@ -103,7 +122,6 @@ export const CommitLOCcount = async (path) => {
       }
     }
 
-    // Calculate effort percentage for each commit
     const results = commitData.map((data) => ({
       ...data,
       effortPercentage: (data.insertions / totalInsertions) * 100,
@@ -111,12 +129,13 @@ export const CommitLOCcount = async (path) => {
 
     return results;
   } catch (err) {
-    throwError(err); // Proper error handling
+    throwError(err);
   }
 };
-// Files aray contains the path of the files and Folders to be ignored
-// const gitIgnoreFiles = (Files) => {};
+
+
 export const gitIgnorFiles = async (repoPath, ignoreFiles) => {
+  console.log("ignoreFiles:", ignoreFiles);
   try {
     // Fetching commit hashes and messages in one go
     const logOutput = await execute(
@@ -126,24 +145,29 @@ export const gitIgnorFiles = async (repoPath, ignoreFiles) => {
       throw new Error("No output from git command");
     }
 
-    const lines = logOutput.split("\n");
+    const lines = logOutput.split(/\r?\n/); // Split lines correctly for both Windows and Unix
     let commitData = {};
     let currentHash = null;
     let expectMessage = false; // State flag to capture the next line as message
 
     lines.forEach((line) => {
-      const trimmedLine = line.trim();
+      const trimmedLine = line.trim().replace(/^'|'$/g, ''); // Trim spaces and remove leading/trailing single quotes
+      // console.log(`Processing line: '${trimmedLine}'`); // Log each line being processed
+
       if (!trimmedLine) return; // Skip empty lines
 
       if (expectMessage) {
-        // The line following the hash is the commit message
-        commitData[currentHash].message = trimmedLine;
-        expectMessage = false; // Reset the flag
+        if (commitData[currentHash]) {
+          commitData[currentHash].message = trimmedLine;
+          expectMessage = false; // Reset the flag
+        } else {
+          console.error(`Error: commitData[${currentHash}] is undefined when expecting message`);
+        }
         return;
       }
 
       // Check if the line is a commit hash
-      if (trimmedLine.length === 40 && !/\t/.test(trimmedLine)) {
+      if (trimmedLine.length === 40 && /^[0-9a-f]{40}$/.test(trimmedLine)) {
         currentHash = trimmedLine;
         expectMessage = true; // Set flag to capture the next line as the message
         commitData[currentHash] = {
@@ -154,6 +178,10 @@ export const gitIgnorFiles = async (repoPath, ignoreFiles) => {
         };
       } else if (!expectMessage && trimmedLine.includes("\t")) {
         // Ensure it's a numstat line
+        if (!currentHash || !commitData[currentHash]) {
+          console.error(`Error: currentHash is undefined when processing numstat`);
+          return;
+        }
         const lineParts = trimmedLine.split("\t");
         if (lineParts.length === 3) {
           const [insertions, , filePath] = lineParts;
@@ -185,24 +213,20 @@ export const gitIgnorFiles = async (repoPath, ignoreFiles) => {
     throw err;
   }
 };
-// const execute = require("child_process").execSync; // If you're using Node.js to execute shell commands
+
 
 async function addCommitMessages(results, repoPath) {
-  // Iterate over each commit in the results
   for (let commit of results) {
     try {
-      // Fetch the commit message for the given commit hash
       const command = `git log -1 --format=%B ${commit.hash}`;
       const commitMessageOutput = execute(command).toString().trim();
 
-      // Add the commit message to the commit object
       commit.message = commitMessageOutput;
     } catch (error) {
       console.error(
         `Error fetching commit message for hash ${commit.hash}:`,
         error
       );
-      // Optionally set a default message or handle the error as needed
       commit.message = "Commit message unavailable";
     }
   }
@@ -223,15 +247,7 @@ function totalInsertions(data) {
 
 export const gitIgnoreFiles = async (repoPath, Files) => {
   try {
-    // Get the repository root path to ensure paths are relative to it
-    // const repoRoot = await getRepoRoot(repoPath);
-    // console.log("Repo path which  was passed", repoPath);
-    // const normalizedIgnoreFiles = normalizePaths(repoPath, Files);
     const results = await gitIgnorFiles(repoPath, Files);
-    // console.log(results);
-    ///addign the names
-    // const results2 = await addCommitMessages(results, repoPath);
-    // console.log(results2);
     return results;
   } catch (err) {
     throwError(err);
