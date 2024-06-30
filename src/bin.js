@@ -282,7 +282,7 @@ const start = async (filter) => {
       }
       commit = commits[number - 1];
       // console.log(chalk.chalkAnimation())
-      chalkAnimation.rainbow("Please wait...").start()
+      chalkAnimation.rainbow("Please wait...").start();
       return changeDate(dirPath, commit.hash, date, date);
     })
     .then(() => {
@@ -670,7 +670,7 @@ export const makeCommitsChanges = async (results, path2) => {
           chalk.bold.italic.magenta(commit.message)
         );
         let str = "Please wait...";
-        const rainbow = chalkAnimation.rainbow(str).start()
+        const rainbow = chalkAnimation.rainbow(str).start();
 
         // Add a new dot every second
         setInterval(() => {
@@ -688,7 +688,10 @@ export const makeCommitsChanges = async (results, path2) => {
           )
         );
       } catch (err) {
-        console.error(`Error changing date for commit `, chalk.red.bold(commit.message));
+        console.error(
+          `Error changing date for commit `,
+          chalk.red.bold(commit.message)
+        );
         console.log(chalk.bold.blue.italic(err));
         break; // Break the loop if an error occurs
       }

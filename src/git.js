@@ -7,7 +7,6 @@ import { promisify } from "util";
 import path from "path";
 const exec = promisify(execCallback);
 
-
 moment.suppressDeprecationWarnings = true;
 
 const getRepoRoot = async (repoPath) => {
@@ -52,32 +51,33 @@ export const changeDate = async (repoPath, hash, authorDate, committerDate) => {
     const authorDateFormatted = formatGitDate(authorDate);
     const committerDateFormatted = formatGitDate(committerDate);
 
-    // console.log(
-    //   `Changing date for commit ${hash}`
-    // );
+    // console.log(`Changing date for commit ${hash}`);
+    // console.log(`Author Date: ${authorDateFormatted}`);
+    // console.log(`Committer Date: ${committerDateFormatted}`);
 
     // Check for unstaged changes before running the command
     const { stdout: statusOutput } = await exec(
       `cd ${repoPath} && git status --porcelain`
     );
     if (statusOutput) {
-      // console.log("unstaged changes")
+      // console.log("Unstaged changes detected.");
+
+      //dfghjk
       throwError(new Error("unstaged changes"));
-      // throw new Error("DATE_INVALID: Unstaged changes present");
     }
 
-    const command = `git filter-branch -f --env-filter " \
-      if [ $GIT_COMMIT = ${hash} ]; then \
-      export GIT_AUTHOR_DATE='${authorDateFormatted}'; \
-      export GIT_COMMITTER_DATE='${committerDateFormatted}'; \
-      fi"`;
-
-    const filterBranchCommand = process.platform === "win32"
-      ? `cd ${repoPath} && set GIT_COMMIT=${hash} && set GIT_AUTHOR_DATE=${authorDateFormatted} && set GIT_COMMITTER_DATE=${committerDateFormatted} && ${command}`
-      : `cd ${repoPath} && ${command}`;
+    const filterBranchCommand =
+      process.platform === "win32"
+        ? `cd ${repoPath} && set GIT_COMMIT=${hash} && set GIT_AUTHOR_DATE="${authorDateFormatted}" && set GIT_COMMITTER_DATE="${committerDateFormatted}" && git filter-branch -f --env-filter "if [ \\$GIT_COMMIT = ${hash} ]; then export GIT_AUTHOR_DATE=\\"${authorDateFormatted}\\"; export GIT_COMMITTER_DATE=\\"${committerDateFormatted}\\"; fi"`
+        : `cd ${repoPath} && GIT_COMMIT=${hash} GIT_AUTHOR_DATE="${authorDateFormatted}" GIT_COMMITTER_DATE="${committerDateFormatted}" git filter-branch -f --env-filter "if [ \\$GIT_COMMIT = ${hash} ]; then export GIT_AUTHOR_DATE=\\"${authorDateFormatted}\\"; export GIT_COMMITTER_DATE=\\"${committerDateFormatted}\\"; fi"`;
 
     // console.log(`Executing command: ${filterBranchCommand}`);
-    return await exec(filterBranchCommand);
+    const { stdout, stderr } = await exec(filterBranchCommand);
+
+    // console.log(`Command stdout: ${stdout}`);
+    // console.log(`Command stderr: ${stderr}`);
+
+    return { stdout, stderr };
   } catch (err) {
     // console.error("Error changing date:", err);
     throw err;
@@ -133,7 +133,6 @@ export const CommitLOCcount = async (path) => {
   }
 };
 
-
 export const gitIgnorFiles = async (repoPath, ignoreFiles) => {
   console.log("ignoreFiles:", ignoreFiles);
   try {
@@ -151,7 +150,7 @@ export const gitIgnorFiles = async (repoPath, ignoreFiles) => {
     let expectMessage = false; // State flag to capture the next line as message
 
     lines.forEach((line) => {
-      const trimmedLine = line.trim().replace(/^'|'$/g, ''); // Trim spaces and remove leading/trailing single quotes
+      const trimmedLine = line.trim().replace(/^'|'$/g, ""); // Trim spaces and remove leading/trailing single quotes
       // console.log(`Processing line: '${trimmedLine}'`); // Log each line being processed
 
       if (!trimmedLine) return; // Skip empty lines
@@ -161,7 +160,9 @@ export const gitIgnorFiles = async (repoPath, ignoreFiles) => {
           commitData[currentHash].message = trimmedLine;
           expectMessage = false; // Reset the flag
         } else {
-          console.error(`Error: commitData[${currentHash}] is undefined when expecting message`);
+          console.error(
+            `Error: commitData[${currentHash}] is undefined when expecting message`
+          );
         }
         return;
       }
@@ -179,7 +180,9 @@ export const gitIgnorFiles = async (repoPath, ignoreFiles) => {
       } else if (!expectMessage && trimmedLine.includes("\t")) {
         // Ensure it's a numstat line
         if (!currentHash || !commitData[currentHash]) {
-          console.error(`Error: currentHash is undefined when processing numstat`);
+          console.error(
+            `Error: currentHash is undefined when processing numstat`
+          );
           return;
         }
         const lineParts = trimmedLine.split("\t");
@@ -213,7 +216,6 @@ export const gitIgnorFiles = async (repoPath, ignoreFiles) => {
     throw err;
   }
 };
-
 
 async function addCommitMessages(results, repoPath) {
   for (let commit of results) {
