@@ -5,6 +5,8 @@ import execute from "./execute.js";
 import { exec as execCallback } from "child_process";
 import { promisify } from "util";
 import path from "path";
+import fs from "fs";
+
 const exec = promisify(execCallback);
 
 moment.suppressDeprecationWarnings = true;
@@ -46,6 +48,13 @@ export const formatGitDate = (date) => {
   return momentDate.format("ddd MMM DD HH:mm:ss YYYY ZZ");
 };
 
+
+
+
+
+
+
+
 export const changeDate = async (repoPath, hash, authorDate, committerDate) => {
   try {
     const authorDateFormatted = formatGitDate(authorDate);
@@ -61,23 +70,45 @@ export const changeDate = async (repoPath, hash, authorDate, committerDate) => {
     );
     if (statusOutput) {
       // console.log("Unstaged changes detected.");
-
-      //dfghjk
       throwError(new Error("unstaged changes"));
     }
 
-    const filterBranchCommand =
-      process.platform === "win32"
-        ? `cd ${repoPath} && set GIT_COMMIT=${hash} && set GIT_AUTHOR_DATE="${authorDateFormatted}" && set GIT_COMMITTER_DATE="${committerDateFormatted}" && git filter-branch -f --env-filter "if [ \\$GIT_COMMIT = ${hash} ]; then export GIT_AUTHOR_DATE=\\"${authorDateFormatted}\\"; export GIT_COMMITTER_DATE=\\"${committerDateFormatted}\\"; fi"`
-        : `cd ${repoPath} && GIT_COMMIT=${hash} GIT_AUTHOR_DATE="${authorDateFormatted}" GIT_COMMITTER_DATE="${committerDateFormatted}" git filter-branch -f --env-filter "if [ \\$GIT_COMMIT = ${hash} ]; then export GIT_AUTHOR_DATE=\\"${authorDateFormatted}\\"; export GIT_COMMITTER_DATE=\\"${committerDateFormatted}\\"; fi"`;
+    if (process.platform === "win32") {
+      // Windows approach
+      const scriptContent = `
+        @echo off
+        setlocal
+        set GIT_AUTHOR_DATE="${authorDateFormatted}"
+        set GIT_COMMITTER_DATE="${committerDateFormatted}"
+        cd /d "${repoPath}" && git filter-branch -f --env-filter "if [ $GIT_COMMIT = ${hash} ]; then export GIT_AUTHOR_DATE='${authorDateFormatted}'; export GIT_COMMITTER_DATE='${committerDateFormatted}'; fi"
+        endlocal
+      `;
 
-    // console.log(`Executing command: ${filterBranchCommand}`);
-    const { stdout, stderr } = await exec(filterBranchCommand);
+      const scriptPath = path.join(repoPath, "change-date.bat");
+      fs.writeFileSync(scriptPath, scriptContent);
 
-    // console.log(`Command stdout: ${stdout}`);
-    // console.log(`Command stderr: ${stderr}`);
+      // console.log(`Executing command from batch file: ${scriptPath}`);
+      const { stdout, stderr } = await exec(`cmd.exe /c "${scriptPath}"`);
 
-    return { stdout, stderr };
+      fs.unlinkSync(scriptPath); // Clean up the script file
+
+      // console.log(`Command stdout: ${stdout}`);
+      // console.log(`Command stderr: ${stderr}`);
+
+      return { stdout, stderr };
+    } else {
+      // Unix approach
+      const filterBranchCommand = `cd ${repoPath} && GIT_COMMIT=${hash} GIT_AUTHOR_DATE="${authorDateFormatted}" GIT_COMMITTER_DATE="${committerDateFormatted}" git filter-branch -f --env-filter "if [ \\$GIT_COMMIT = ${hash} ]; then export GIT_AUTHOR_DATE=\\"${authorDateFormatted}\\"; export GIT_COMMITTER_DATE=\\"${committerDateFormatted}\\"; fi"`
+
+
+      console.log(`Executing command: ${filterBranchCommand}`);
+      const { stdout, stderr } = await exec(filterBranchCommand);
+
+      console.log(`Command stdout: ${stdout}`);
+      console.log(`Command stderr: ${stderr}`);
+
+      return { stdout, stderr };
+    }
   } catch (err) {
     // console.error("Error changing date:", err);
     throw err;
